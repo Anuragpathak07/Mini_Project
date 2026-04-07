@@ -7,11 +7,14 @@ import FormData from 'form-data';
 import axios from 'axios';
 import fs from 'fs';
 import authRoutes from './routes/auth';
+import { authenticate, AuthRequest } from './middleware/auth';
+import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 5000;
+const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
@@ -45,8 +48,32 @@ app.post('/api/v1/hello', (req: Request, res: Response) => {
   }
 });
 
+// Fetch historical reports for patient
+app.get('/api/v1/reports', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const patientProfile = await prisma.patientProfile.findUnique({
+      where: { userId: req.user.userId }
+    });
+
+    if (!patientProfile) {
+      res.status(404).json({ error: 'Patient profile not found' });
+      return;
+    }
+
+    const reports = await prisma.medicalReport.findMany({
+      where: { patientId: patientProfile.id },
+      orderBy: { uploadedAt: 'desc' }
+    });
+
+    res.status(200).json({ reports });
+  } catch (error: any) {
+    console.error('Error fetching reports:', error);
+    res.status(500).json({ error: 'Failed to fetch reports' });
+  }
+});
+
 // Proxies the file upload to the FastAPI AI service
-app.post('/api/v1/analyze', upload.single('report'), async (req: Request, res: Response): Promise<void> => {
+app.post('/api/v1/analyze', authenticate, upload.single('report'), async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({ error: 'No report file provided' });
@@ -69,6 +96,29 @@ app.post('/api/v1/analyze', upload.single('report'), async (req: Request, res: R
 
     // Cleanup temp uploaded file
     fs.unlinkSync(req.file.path);
+
+    // Persist to Database if patient
+    try {
+      if (req.user && req.user.role === 'PATIENT') {
+        const patientProfile = await prisma.patientProfile.findUnique({
+          where: { userId: req.user.userId }
+        });
+
+        if (patientProfile) {
+          const savedReport = await prisma.medicalReport.create({
+            data: {
+              patientId: patientProfile.id,
+              originalText: 'Raw OCR data available', 
+              simplifiedResult: response.data.simplified_report,
+            }
+          });
+          res.status(200).json({ ...response.data, savedReportId: savedReport.id });
+          return;
+        }
+      }
+    } catch (saveError) {
+      console.error('Failed to save to database but AI succeeded', saveError);
+    }
 
     res.status(200).json(response.data);
   } catch (error: any) {

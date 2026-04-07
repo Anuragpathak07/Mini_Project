@@ -1,13 +1,45 @@
-import React from 'react';
+'use client';
+import React, { useEffect, useState } from 'react';
 import ReportUploader from '@/components/ReportUploader';
 
 export default function PatientDashboard() {
+  const [reports, setReports] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+    const fetchReports = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      try {
+        const res = await fetch('http://localhost:5000/api/v1/reports', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setReports(data.reports);
+        }
+      } catch (e) {
+        console.error("Failed to fetch reports");
+      }
+    };
+    fetchReports();
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <div className="max-w-4xl mx-auto space-y-6">
         <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800">Welcome Back, Patient</h1>
+            <h1 className="text-3xl font-bold text-slate-800">Welcome Back{user ? `, ${user.email.split('@')[0]}` : ''}</h1>
             <p className="text-slate-500 mt-1">Here is the overview of your health records.</p>
           </div>
           <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xl">
@@ -17,22 +49,23 @@ export default function PatientDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h2 className="text-xl font-semibold mb-4 text-slate-800">Recent Medical Reports</h2>
+            <h2 className="text-xl font-semibold mb-4 text-slate-800">Your Medical Reports</h2>
             <div className="space-y-3">
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center transition-all hover:-translate-y-1 hover:shadow-md">
-                <div>
-                  <p className="font-medium text-slate-700">Blood Test Results</p>
-                  <p className="text-sm text-slate-500">Oct 24, 2023</p>
+              {reports.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-slate-500 text-sm">
+                  No historical reports available. Try uploading one!
                 </div>
-                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">View Analysis</button>
-              </div>
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center transition-all hover:-translate-y-1 hover:shadow-md">
-                <div>
-                  <p className="font-medium text-slate-700">Chest X-Ray</p>
-                  <p className="text-sm text-slate-500">Oct 10, 2023</p>
-                </div>
-                <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">View Analysis</button>
-              </div>
+              ) : (
+                reports.map(report => (
+                  <div key={report.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center transition-all hover:-translate-y-1 hover:shadow-md">
+                    <div>
+                      <p className="font-medium text-slate-700">Medical Scan</p>
+                      <p className="text-sm text-slate-500">{new Date(report.uploadedAt).toLocaleDateString()}</p>
+                    </div>
+                    <button className="text-blue-600 hover:text-blue-700 text-sm font-medium" onClick={() => alert(report.simplifiedResult)}>View Summary</button>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 

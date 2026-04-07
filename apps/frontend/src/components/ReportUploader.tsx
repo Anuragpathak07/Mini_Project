@@ -45,9 +45,12 @@ export default function ReportUploader() {
     formData.append('report', file);
 
     try {
-      // Calling Express backend gateway
+      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:5000/api/v1/analyze', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       });
 
