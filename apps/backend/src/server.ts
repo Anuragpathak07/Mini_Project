@@ -73,6 +73,46 @@ app.post('/api/v1/chat', authenticate, async (req: AuthRequest, res: Response): 
   }
 });
 
+// Proxy for the Doctor Radiology Analysis
+app.post('/api/v1/radiology/analyze', authenticate, upload.single('scan'), async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user?.role !== 'DOCTOR') {
+      res.status(403).json({ error: 'Access denied: Doctors only' });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ error: 'No scan file provided' });
+      return;
+    }
+
+    const form = new FormData();
+    form.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+    
+    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+    console.log(`Forwarding scan to AI Service at ${aiServiceUrl}/analyze-radiology`);
+    
+    const response = await axios.post(`${aiServiceUrl}/analyze-radiology`, form, {
+      headers: { ...form.getHeaders() }
+    });
+
+    // Cleanup temp uploaded file
+    fs.unlinkSync(req.file.path);
+
+    res.status(200).json(response.data);
+  } catch (error: any) {
+    console.error('Error forwarding to AI Service:', error.message);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    if (error.response) {
+       res.status(error.response.status).json(error.response.data);
+       return;
+    }
+    res.status(500).json({ error: 'Failed to process radiology scan' });
+  }
+});
+
 // Fetch historical reports for patient
 app.get('/api/v1/reports', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

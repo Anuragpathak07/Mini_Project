@@ -1,4 +1,5 @@
 import React from 'react';
+import RadiologyUploader from '@/components/RadiologyUploader';
 
 export default function DoctorDashboard() {
   return (
@@ -36,6 +37,10 @@ export default function DoctorDashboard() {
                   </div>
                 ))}
               </div>
+            </section>
+            
+            <section className="mt-6">
+              <RadiologyUploader />
             </section>
           </div>
 
