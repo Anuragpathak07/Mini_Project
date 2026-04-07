@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import ReportUploader from '@/components/ReportUploader';
 import ChatWidget from '@/components/ChatWidget';
+import PharmacyStore from '@/components/PharmacyStore';
+import BillingPanel from '@/components/BillingPanel';
 
 export default function PatientDashboard() {
   const [reports, setReports] = useState<any[]>([]);
@@ -88,6 +90,12 @@ export default function PatientDashboard() {
             
             <ReportUploader />
           </section>
+        </div>
+
+        {/* E-Pharmacy & Billing Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+           <PharmacyStore />
+           <BillingPanel />
         </div>
       </div>
       

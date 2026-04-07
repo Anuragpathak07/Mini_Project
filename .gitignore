@@ -6,6 +6,7 @@ node_modules
 !.env.example
 
 # Python Caches
+
 __pycache__/
 *.pyc
 .venv/
@@ -14,3 +15,13 @@ env/
 
 # Temp Uploads
 uploads/
+
+# Next.js / Build Outputs
+.next/
+out/
+build/
+dist/
+
+# System Configs
+.DS_Store
+Thumbs.db

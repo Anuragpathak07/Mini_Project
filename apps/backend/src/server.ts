@@ -201,6 +201,39 @@ app.post('/api/v1/analyze', authenticate, upload.single('report'), async (req: A
   }
 });
 
+// Pharmacy Endpoints
+app.get('/api/v1/pharmacy/medicines', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const medicines = await prisma.medicine.findMany();
+    res.status(200).json({ medicines });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch medicines' });
+  }
+});
+
+// Billing Endpoints
+app.get('/api/v1/billing/invoices', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (req.user?.role !== 'PATIENT') {
+      res.status(200).json({ invoices: [] });
+      return;
+    }
+    const patient = await prisma.patientProfile.findUnique({ where: { userId: req.user.userId } });
+    if (!patient) {
+      res.status(404).json({ error: 'Patient not found' });
+      return;
+    }
+    
+    const invoices = await prisma.invoice.findMany({
+      where: { patientId: patient.id },
+      orderBy: { issuedAt: 'desc' }
+    });
+    res.status(200).json({ invoices });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch invoices' });
+  }
+});
+
 app.listen(port, () => {
   console.log(`[server]: Server is running at http://localhost:${port}`);
 });
