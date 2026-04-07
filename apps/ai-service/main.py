@@ -15,6 +15,10 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
+class ChatRequest(BaseModel):
+    message: str
+    history: list = []
+
 # Load env variables (Ensure GEMINI_API_KEY and OCR_SPACE_API_KEY are in your apps/ai-service/.env)
 load_dotenv()
 
@@ -195,6 +199,28 @@ app.add_middleware(
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "ai-service"}
+
+@app.post("/chat")
+async def hospital_chat(req: ChatRequest):
+    """Conversational endpoint acting as the Hospital Assistant."""
+    if not model:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY is not configured.")
+    
+    # Construct context from history if needed (simplified for MVP)
+    # Gemini 2.5 Flash can accept conversation history natively, but we'll use a strong system prompt first.
+    
+    prompt = f"""
+You are an intelligent, empathetic, and professional AI Hospital Assistant named "MediBot". 
+You are embedded in the Patient Portal of an advanced Hospital Management System.
+Your job is to answer patient questions, explain general hospital procedures, and provide helpful guidance without giving formal medical diagnoses. Always advise them to consult their doctor for clinical concerns.
+
+Patient's message: "{req.message}"
+"""
+    try:
+        response = model.generate_content(prompt)
+        return {"response": response.text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze-report")
 async def analyze_report(file: UploadFile = File(...)):

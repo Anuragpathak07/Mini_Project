@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import ReportUploader from '@/components/ReportUploader';
+import ChatWidget from '@/components/ChatWidget';
 
 export default function PatientDashboard() {
   const [reports, setReports] = useState<any[]>([]);
@@ -89,6 +90,9 @@ export default function PatientDashboard() {
           </section>
         </div>
       </div>
+      
+      {/* Floating Chatbot */}
+      <ChatWidget />
     </div>
   );
 }

@@ -39,12 +39,37 @@ const helloSchema = z.object({
   name: z.string().min(1, 'Name is required'),
 });
 
+const chatSchema = z.object({
+  message: z.string().min(1, 'Message is required'),
+});
+
 app.post('/api/v1/hello', (req: Request, res: Response) => {
   try {
     const data = helloSchema.parse(req.body);
     res.status(200).json({ message: `Hello, ${data.name}! AI-augmented backend is ready.` });
   } catch (error) {
     res.status(400).json({ error: 'Validation failed', details: error });
+  }
+});
+
+// Proxy for the AI Hospital Chatbot
+app.post('/api/v1/chat', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const data = chatSchema.parse(req.body);
+    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+    
+    const response = await axios.post(`${aiServiceUrl}/chat`, {
+      message: data.message
+    });
+
+    res.status(200).json(response.data);
+  } catch (error: any) {
+    console.error('Chat AI Error:', error.message);
+    if (error.response) {
+       res.status(error.response.status).json(error.response.data);
+       return;
+    }
+    res.status(500).json({ error: 'Failed to reach AI chatbot service' });
   }
 });
 
