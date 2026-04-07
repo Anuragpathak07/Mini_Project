@@ -55,7 +55,14 @@ export default function ReportUploader() {
       });
 
       if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+        let errorMessage = `Server returned ${res.status}`;
+        try {
+          const errData = await res.json();
+          errorMessage = errData.detail || errData.error || errorMessage;
+        } catch (e) {
+          // fallback to status code if json fails
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await res.json();

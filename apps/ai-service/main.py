@@ -1,26 +1,32 @@
 import os
 import shutil
 import tempfile
+import requests
 import pytesseract
 from pdf2image import convert_from_path
 from PIL import Image
-from transformers import pipeline, AutoTokenizer, AutoModel
+from transformers import pipeline
 import torch
 from dotenv import load_dotenv
 import google.generativeai as genai
+from pdf2image.exceptions import PDFInfoNotInstalledError
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load env variables (Ensure GEMINI_API_KEY is in your apps/ai-service/.env)
+# Load env variables (Ensure GEMINI_API_KEY and OCR_SPACE_API_KEY are in your apps/ai-service/.env)
 load_dotenv()
 
 # Tesseract Configuration (Windows Default)
 if os.name == "nt":
     pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD", r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+else:
+    pytesseract.pytesseract.tesseract_cmd = "tesseract"
 
 api_key = os.getenv("GEMINI_API_KEY")
+ocr_space_api_key = os.getenv("OCR_SPACE_API_KEY")
+
 if api_key:
     genai.configure(api_key=api_key)
     generation_config = {
@@ -40,28 +46,71 @@ else:
     model = None
 
 # Initialize local HuggingFace NLP pipelines lazily to save startup time if not needed immediately
-_tokenizer = None
-_biobert_model = None
 _ner_pipeline = None
 
-def get_nlp_models():
-    global _tokenizer, _biobert_model, _ner_pipeline
+def get_ner_pipeline():
+    global _ner_pipeline
     if _ner_pipeline is None:
-        print("Loading NLP models lazily...")
-        biobert_model_name = "dmis-lab/biobert-v1.1"
-        _tokenizer = AutoTokenizer.from_pretrained(biobert_model_name)
-        _biobert_model = AutoModel.from_pretrained(biobert_model_name)
+        print("Loading NER Pipeline (this happens only once)...")
         _ner_pipeline = pipeline("ner", model="d4data/biomedical-ner-all", tokenizer="d4data/biomedical-ner-all", aggregation_strategy="simple")
-    return _tokenizer, _biobert_model, _ner_pipeline
+    return _ner_pipeline
 
 # ----------------- Core Logic -----------------
+def extract_text_ocr_space(file_path):
+    """Sends file to OCR Space API and parses response."""
+    if not ocr_space_api_key:
+        raise ValueError("OCR_SPACE_API_KEY not set.")
+    
+    payload = {
+        'apikey': ocr_space_api_key,
+        'language': 'eng',
+        'isOverlayRequired': False,
+        'OCREngine': 2 # Engine 2 is often better for numbers/messy text
+    }
+    
+    with open(file_path, 'rb') as f:
+        r = requests.post(
+            'https://api.ocr.space/parse/image',
+            files={file_path: f},
+            data=payload,
+        )
+    
+    result = r.json()
+    
+    if result.get('IsErroredOnProcessing'):
+        error_msg = result.get('ErrorMessage', ['Unknown API error'])[0]
+        raise RuntimeError(f"OCR Space Error: {error_msg}")
+        
+    parsed_text = ""
+    for result_dict in result.get('ParsedResults', []):
+        parsed_text += result_dict.get('ParsedText', '') + "\n"
+        
+    return parsed_text
+
 def extract_text(file_path: str) -> str:
     print(f"Extracting text from document: {file_path}")
+    
+    # 1. Attempt OCR Space if configured
+    if ocr_space_api_key:
+        try:
+            print("Attempting OCR using OCR Space API...")
+            text = extract_text_ocr_space(file_path)
+            if text.strip():
+                print("✅ Successfully used OCR Space API.")
+                return text
+        except Exception as e:
+            print(f"⚠️ OCR Space failed: {e}. Falling back to local Tesseract...")
+            
+    # 2. Fallback to Local Tesseract
+    print("Running local Tesseract OCR...")
     text = ""
     if file_path.lower().endswith('.pdf'):
-        pages = convert_from_path(file_path)
-        for page in pages:
-            text += pytesseract.image_to_string(page) + "\n"
+        try:
+            pages = convert_from_path(file_path)
+            for page in pages:
+                text += pytesseract.image_to_string(page) + "\n"
+        except PDFInfoNotInstalledError:
+            raise RuntimeError("PDF processing requires Poppler. Please install Poppler and add its binary folder to your system PATH (Windows), or use an image instead.")
     elif file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp')):
         image = Image.open(file_path)
         text = pytesseract.image_to_string(image)
@@ -69,26 +118,30 @@ def extract_text(file_path: str) -> str:
         raise ValueError("Unsupported file format. Please provide a PDF or image file (.png, .jpg, .jpeg, etc.).")
     return text
 
-def extract_and_embed_medical_terms(text: str):
-    tokenizer, biobert_model, ner_pipeline = get_nlp_models()
+def extract_medical_terms(text: str):
+    """Extracts medical terms using NER with text chunking to avoid max length errors."""
     print("Extracting medical terms from text...")
-    entities = ner_pipeline(text)
     
-    # Extract unique terms longer than 2 characters
-    terms = list(set([ent['word'] for ent in entities if len(ent['word']) > 2]))
-    print(f"Found {len(terms)} unique medical terms.")
+    chunk_size = 1500  
+    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
     
-    term_embeddings = {}
-    print("Generating BioBERT embeddings for terms...")
-    for term in terms:
-        inputs = tokenizer(term, return_tensors="pt", truncation=True, padding=True)
-        with torch.no_grad():
-            outputs = biobert_model(**inputs)
-            # Use the CLS token embedding (first token)
-            embedding = outputs.last_hidden_state[:, 0, :].squeeze().numpy()
-            term_embeddings[term] = embedding.tolist() # Convert to list for JSON serialization if needed later
+    ner_pipeline = get_ner_pipeline()
+    
+    terms = set()
+    for i, chunk in enumerate(chunks):
+        if not chunk.strip():
+            continue
+        try:
+            entities = ner_pipeline(chunk)
+            for ent in entities:
+                if len(ent['word']) > 2:
+                    terms.add(ent['word'])
+        except Exception as e:
+            print(f"Warning: NER skipped a chunk due to an error: {e}")
             
-    return terms, term_embeddings
+    terms_list = list(terms)
+    print(f"Found {len(terms_list)} unique medical terms.")
+    return terms_list
 
 def simplify_medical_report(raw_text: str, medical_terms: list) -> str:
     if not model:
@@ -97,7 +150,10 @@ def simplify_medical_report(raw_text: str, medical_terms: list) -> str:
     prompt = f"""
 You are a helpful, empathetic medical assistant. Your job is to simplify a medical report for a patient who has no medical background.
 
-Here is the raw text extracted from the patient's medical report:
+First, determine if the provided text is actually a medical report, clinical note, or laboratory results document. If the text does NOT appear to be a medical document (e.g., if it's a recipe, receipt, random article, or non-medical text), you MUST immediately abort and return EXACTLY the following error string, and nothing else:
+ERROR: NOT_A_MEDICAL_REPORT
+
+If it IS a valid medical document, here is the raw text extracted from it:
 \"\"\"
 {raw_text}
 \"\"\"
@@ -146,7 +202,7 @@ async def analyze_report(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file uploaded")
     
-    # Save uploaded file temporarily for Tesseract to read
+    # Save uploaded file temporarily for OCR processors
     suffix = os.path.splitext(file.filename)[1]
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
         shutil.copyfileobj(file.file, temp_file)
@@ -154,15 +210,22 @@ async def analyze_report(file: UploadFile = File(...)):
 
     try:
         # 1. OCR
-        raw_text = extract_text(temp_path)
-        if not raw_text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract any text from the document.")
+        try:
+            raw_text = extract_text(temp_path)
+            if not raw_text.strip():
+                raise HTTPException(status_code=400, detail="Could not extract any text from the document.")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
 
         # 2. Extract Medical Terms
-        terms, embeddings = extract_and_embed_medical_terms(raw_text)
+        terms = extract_medical_terms(raw_text)
 
         # 3. LLM Simplification
         simplified_output = simplify_medical_report(raw_text, terms)
+
+        # Handle the new "Not a Medical Report" rejection logic
+        if "ERROR: NOT_A_MEDICAL_REPORT" in simplified_output:
+            raise HTTPException(status_code=406, detail="The provided document does not appear to be a medical report.")
 
         return {
             "success": True,
@@ -170,9 +233,11 @@ async def analyze_report(file: UploadFile = File(...)):
             "terms_extracted": len(terms),
             "simplified_report": simplified_output
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Error during processing: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
     finally:
         # Cleanup temp file
         if os.path.exists(temp_path):
