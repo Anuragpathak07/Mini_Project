@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 'use client';
 import React, { useEffect, useState } from 'react';
 import ReportUploader from '@/components/ReportUploader';

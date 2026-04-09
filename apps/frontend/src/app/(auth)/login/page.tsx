@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 'use client';
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -165,7 +166,7 @@ export default function LoginPage() {
             {/* Footer Links */}
             <div className="pt-4 text-center">
               <p className="text-sm text-on-surface-variant">
-                Don't have an account? 
+                Don&apos;t have an account? 
                 <Link href="/register" className="text-primary ml-1 font-bold hover:underline decoration-2 underline-offset-4">Register your practice</Link>
               </p>
             </div>

@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@import "tailwindcss";
-
 @theme inline {
   --color-background: #f7f9fb;
   --color-on-background: #191c1e;
@@ -40,9 +38,9 @@
   --color-outline: #737685;
   --color-outline-variant: #c3c6d6;
   
-  --font-sans: 'Inter', sans-serif;
-  --font-headline: 'Inter', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-sans: var(--font-inter), 'Inter', sans-serif;
+  --font-headline: var(--font-inter), 'Inter', sans-serif;
+  --font-body: var(--font-inter), 'Inter', sans-serif;
 }
 
 @layer base {
