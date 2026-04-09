@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ==========================================
+  # Core Infrastructure
+  # ==========================================
   postgres:
     image: postgres:15-alpine
     container_name: hms-postgres
@@ -12,7 +15,200 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hms_network
     restart: always
+
+  redis:
+    image: redis:alpine
+    container_name: hms-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - hms_network
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: hms-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - hms_network
+    restart: always
+
+  # ==========================================
+  # Gateways & Frontends
+  # ==========================================
+  frontend:
+    build: 
+      context: ./apps/frontend
+    container_name: hms-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - hms_network
+    depends_on:
+      - api-gateway
+
+  api-gateway:
+    build:
+      context: ./apps/api-gateway
+    container_name: hms-api-gateway
+    ports:
+      - "4000:4000"
+    networks:
+      - hms_network
+    depends_on:
+      - backend
+      - ai-service
+
+  # ==========================================
+  # Specialized Heavy Services
+  # ==========================================
+  backend:
+    build:
+      context: ./apps/backend
+    container_name: hms-backend-monolith
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/hms_db
+      - AI_SERVICE_URL=http://ai-service:8000
+      - JWT_SECRET=super_secret_key_123
+    networks:
+      - hms_network
+    depends_on:
+      - postgres
+
+  ai-service:
+    build:
+      context: ./apps/ai-service
+    container_name: hms-ai-service
+    environment:
+      - ENVIRONMENT=production
+    networks:
+      - hms_network
+
+  # ==========================================
+  # Distributed Microservices (12 units)
+  # ==========================================
+  hospital-service:
+    build: ./apps/hospital-service
+    container_name: hms-hospital-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+    networks:
+      - hms_network
+
+  appointment-service:
+    build: ./apps/appointment-service
+    container_name: hms-appointment-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5002
+    networks:
+      - hms_network
+
+  prescription-service:
+    build: ./apps/prescription-service
+    container_name: hms-prescription-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5003
+    networks:
+      - hms_network
+
+  notification-service:
+    build: ./apps/notification-service
+    container_name: hms-notification-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5004
+    networks:
+      - hms_network
+
+  communication-service:
+    build: ./apps/communication-service
+    container_name: hms-communication-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5005
+    networks:
+      - hms_network
+
+  analytics-service:
+    build: ./apps/analytics-service
+    container_name: hms-analytics-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5006
+    networks:
+      - hms_network
+
+  search-service:
+    build: ./apps/search-service
+    container_name: hms-search-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5007
+    networks:
+      - hms_network
+
+  event-service:
+    build: ./apps/event-service
+    container_name: hms-event-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5008
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+    networks:
+      - hms_network
+    depends_on:
+      - rabbitmq
+
+  cache-service:
+    build: ./apps/cache-service
+    container_name: hms-cache-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5009
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - hms_network
+    depends_on:
+      - redis
+
+  audit-service:
+    build: ./apps/audit-service
+    container_name: hms-audit-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5010
+    networks:
+      - hms_network
+
+  integration-service:
+    build: ./apps/integration-service
+    container_name: hms-integration-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5011
+    networks:
+      - hms_network
+
+  storage-service:
+    build: ./apps/storage-service
+    container_name: hms-storage-service
+    environment:
+      - NODE_ENV=production
+      - PORT=5012
+    networks:
+      - hms_network
+
+networks:
+  hms_network:
+    driver: bridge
 
 volumes:
   postgres_data:
