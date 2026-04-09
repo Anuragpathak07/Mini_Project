@@ -1,0 +1,23 @@
+import express, { Request, Response } from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const app = express();
+const port = process.env.PORT || 5009;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', service: 'cache-service', description: 'Redis Cache Interface', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/v1/cache', (req: Request, res: Response) => {
+  res.status(200).json({ message: 'Welcome to the Redis Cache Interface' });
+});
+
+app.listen(port, () => {
+  console.log(`[cache-service]: Server is running at http://localhost:${port}`);
+});
