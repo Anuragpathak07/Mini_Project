@@ -1,6 +1,9 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Hoisted pnpm deps live at the monorepo root; tracing must include that tree on Vercel/Linux.
+  outputFileTracingRoot: path.join(__dirname, "../.."),
   eslint: {
     // ESLint is run separately; skip during build to avoid config version conflicts
     ignoreDuringBuilds: true,
