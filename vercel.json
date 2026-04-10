@@ -1,5 +1,5 @@
 {
   "framework": "nextjs",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "npx prisma generate && npx next build"
+  "buildCommand": "pnpm --filter frontend build"
 }
