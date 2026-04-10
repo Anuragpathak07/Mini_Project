@@ -295,32 +295,32 @@ function Modal({ title, body, onConfirm, onCancel, confirmText = "Confirm" }) {
 }
 
 // ─── ENTRY POINT ──────────────────────────────────────────────────────────────
-export default function PatientDashboard({ store: storeProp, updateStore: updateStoreProp, onLogout: onLogoutProp, showToast: showToastProp }) {
+export default function PatientDashboard() {
   const [internalStore, setInternalStore] = useState(loadStore);
   const [internalToast, setInternalToast] = useState("");
-  const isStandalone = !storeProp;
-  const store = storeProp || internalStore;
+  const isStandalone = true;
+  const store = internalStore;
 
-  const updateStore = updateStoreProp || useCallback((patch) => {
-    setInternalStore(prev => {
+  const updateStore = useCallback((patch: Record<string, unknown>) => {
+    setInternalStore((prev: Record<string, unknown>) => {
       const next = { ...prev, ...patch };
       saveStore(next);
       return next;
     });
   }, []);
 
-  const showToast = showToastProp || ((msg) => {
+  const showToast = (msg: string) => {
     setInternalToast(msg);
     setTimeout(() => setInternalToast(""), 3000);
-  });
+  };
 
-  const onLogout = onLogoutProp || (() => {
+  const onLogout = () => {
     // Clear all auth keys written by login page and our own store
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     window.location.href = '/login';
-  });
+  };
 
   // Guard: if no user is present, redirect to login
   useEffect(() => {

@@ -11,8 +11,8 @@ const ALL_TABS = ['overview','ehr','appointments','prescriptions','labs','radiol
 
 const today = () => new Date().toISOString().split('T')[0];
 const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0]; };
-const fmt = (d) => { try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return d; } };
-const uid = (arr) => Math.max(...arr.map(a => a.id ?? 0), 0) + 1;
+const fmt = (d: string | Date) => { try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); } catch { return d; } };
+const uid = (arr: { id?: number }[]) => Math.max(...arr.map(a => a.id ?? 0), 0) + 1;
 
 const EMPTY_PATIENT = {
   name: '', age: '', gender: 'Male', contact: '', address: '', bloodGroup: 'O+',
