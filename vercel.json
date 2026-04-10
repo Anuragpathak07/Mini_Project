@@ -1,7 +1,5 @@
 {
-  "buildCommand": "cd apps/frontend && npx prisma generate && npx next build",
+  "framework": "nextjs",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "outputDirectory": "apps/frontend/.next",
-  "framework": "nextjs"
-  
+  "buildCommand": "npx prisma generate && npx next build"
 }
