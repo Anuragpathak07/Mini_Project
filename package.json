@@ -11,8 +11,8 @@
     "db:push": "pnpm --filter backend run db:push",
     "db:studio": "pnpm --filter backend run db:studio"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   }
 }
