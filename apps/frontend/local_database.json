@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "a101eee9-ff58-4ed8-a3bb-ebde3f6d43dc",
+      "email": "anurag@gmail.com",
+      "password": "9f8c32b1fcd3d8b2f9f2215b07b32943139ae2f1950da63daed502fa856269e0",
+      "role": "patient",
+      "createdAt": "2026-04-09T19:07:52.484Z"
+    },
+    {
+      "id": "3445a5a7-1ab5-4f00-9011-74e13157c581",
+      "email": "admin@gmail.com",
+      "password": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+      "role": "doctor",
+      "createdAt": "2026-04-10T05:29:32.078Z"
+    }
+  ]
+}
